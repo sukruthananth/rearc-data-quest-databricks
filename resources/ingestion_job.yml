@@ -1,0 +1,27 @@
+resources:
+  jobs:
+    bls_population_ingestion_and_etl:
+      name: rearc_bls_population_job_${bundle.target}
+      schedule:
+        quartz_cron_expression: "0 0 8 * * ?"
+        timezone_id: UTC
+        pause_status: PAUSED
+      tasks:
+        - task_key: sync_raw_sources
+          spark_python_task:
+            python_file: ../src/ingestion/sync_sources.py
+            parameters: []
+          environment_key: default_env
+        - task_key: run_medallion_pipeline
+          depends_on:
+            - task_key: sync_raw_sources
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.bls_population_sdp.id}
+            full_refresh: false
+      environments:
+        - environment_key: default_env
+          spec:
+            client: "1"
+            dependencies:
+              - requests
+              - urllib3
