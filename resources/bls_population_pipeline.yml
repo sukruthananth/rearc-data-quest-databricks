@@ -1,0 +1,10 @@
+resources:
+  pipelines:
+    bls_population_sdp:
+      name: rearc_bls_population_sdp_${bundle.target}
+      catalog: ${var.catalog}
+      target: ${var.schema}
+      serverless: true
+      libraries:
+        - glob:
+            include: ../src/pipelines/transformations/**
