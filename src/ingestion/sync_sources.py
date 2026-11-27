@@ -161,4 +161,38 @@ def sync_bls_directory(session: requests.Session) -> dict:
         stale_path = os.path.join(BLS_DIR, stale_name)
         if os.path.exists(stale_path):
             os.remove(stale_path)
-        del tracked
+        del tracked[stale_name]
+        summary["deleted"].append(stale_name)
+
+    manifest["files"] = tracked
+    manifest["updated_at"] = datetime.now(timezone.utc).isoformat()
+    save_manifest_atomic(MANIFEST_PATH, manifest)
+    return summary
+
+
+def sync_population_data(session: requests.Session) -> dict:
+    os.makedirs(POP_DIR, exist_ok=True)
+    resp = session.get(POPULATION_URL, timeout=60)
+    resp.raise_for_status()
+    payload_bytes = resp.content
+    new_hash = hashlib.sha256(payload_bytes).hexdigest()
+
+    if os.path.exists(POP_FILE) and sha256_file(POP_FILE) == new_hash:
+        return {"file": POP_FILE, "status": "unchanged", "sha256": new_hash}
+
+    tmp_path = f"{POP_FILE}.part"
+    with open(tmp_path, "wb") as f:
+        f.write(payload_bytes)
+    os.replace(tmp_path, POP_FILE)
+    return {"file": POP_FILE, "status": "updated", "sha256": new_hash}
+
+
+def main():
+    session = make_session(CONTACT_EMAIL)
+    bls_result = sync_bls_directory(session)
+    pop_result = sync_population_data(session)
+    print(json.dumps({"bls": bls_result, "population": pop_result}, indent=2))
+
+
+if __name__ == "__main__":
+    main()
